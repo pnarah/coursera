@@ -9,6 +9,7 @@ from commonlib.Prompt import Prompt
 from Capabilities.Capability import Capability
 from Capabilities.TimeAwareCapability import TimeAwareCapability
 from Capabilities.PlanFirstCapability import PlanFirstCapability
+from Capabilities.ProgressTrackingCapability import ProgressTrackingCapability
 
 
 class Agent:
