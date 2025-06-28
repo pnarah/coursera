@@ -31,19 +31,12 @@ When you're done using this environment, return to your normal shell by typing:
 ```
 deactivate
 ```
-## Read env variables
+
+## Run you app
 ```
-import os
-from dotenv import load_dotenv
-# from langchain import OpenAI, SQLDatabase, SQLDatabaseChain
-
-load_dotenv()
-
-# Access environment variables
-api_key = os.getenv('OPENAI_API_KEY')
-pc_api_key = os.getenv('PINECONE_API_KEY')
-
-
-print(f"API Key: {api_key}")
-print(f"Pinecone Password: {pc_api_key}")
+streamlit run app.py
+```
+If this doesn't work, use the long-form command:
+```
+python -m streamlit run app.py
 ```
