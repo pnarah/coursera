@@ -689,7 +689,7 @@ def generate_dataset(num_iterations=5):
                     print(f"Batch of data appended to dataset for chunk {i+1} in iteration {iteration+1}.")
 
 # Call the function to start the process
-# run_pyats_job() pnarah
+run_pyats_job()
 generate_dataset()
 
 # Load the training examples from the file
