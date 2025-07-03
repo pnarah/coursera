@@ -72,6 +72,14 @@ memory = MemorySaver()
 
 compiled_graph = builder.compile(checkpointer=memory)
 
+# ✅ Visualize the Graph 
+# from IPython.display import Image, display
+
+# try:
+#     display(Image(compiled_graph.get_graph().draw_mermaid_png()))
+# except Exception:
+#     # This requires some extra dependencies and is optional
+#     pass
 
 
 def stream_graph_updates(user_input: str):

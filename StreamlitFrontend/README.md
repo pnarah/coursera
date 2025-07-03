@@ -1,3 +1,6 @@
+# docs.streamlit
+https://docs.streamlit.io/get-started
+
 ## Create an environment using venv
 
 Open a terminal and navigate to your project folder.
@@ -38,5 +41,5 @@ streamlit run app.py
 ```
 If this doesn't work, use the long-form command:
 ```
-python -m streamlit run app.py
+python3 -m streamlit run app.py
 ```

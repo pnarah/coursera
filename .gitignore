@@ -1,5 +1,8 @@
 ./BlackBelt/Logic/BlackBelt/.DS_Store
 ./BlackBelt/Logic/BlackBelt/.venv/
 ./BlackBelt/LangGraph/.env
+./BlackBelt/LangGraph/.venv
+./BlackBelt/LangGraph/SpaceGraph/tools/__pycache__/
 ./BlackBelt/.DS_Store
 .DS_Store
+.env
