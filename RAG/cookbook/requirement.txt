@@ -1,0 +1,2 @@
+pinecone
+pip install pinecone-client langchain-pinecone langchain-openai
