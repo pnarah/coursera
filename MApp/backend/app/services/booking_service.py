@@ -67,10 +67,10 @@ class BookingService:
         if not lock_status:
             raise ValueError("Invalid or expired lock ID")
         
-        # Validate lock matches booking parameters
+        # Validate lock matches booking parameters (case-insensitive for room_type)
         if (
             lock_status["hotel_id"] != booking_data.hotel_id or
-            lock_status["room_type"] != booking_data.room_type.lower() or
+            lock_status["room_type"].upper() != booking_data.room_type.upper() or
             lock_status["check_in_date"] != booking_data.check_in.isoformat() or
             lock_status["check_out_date"] != booking_data.check_out.isoformat()
         ):
@@ -97,7 +97,7 @@ class BookingService:
         
         # 3. Calculate pricing
         try:
-            room_type_enum = RoomType(booking_data.room_type.lower())
+            room_type_enum = RoomType(booking_data.room_type.upper())
         except ValueError:
             raise ValueError(f"Invalid room type: {booking_data.room_type}")
         

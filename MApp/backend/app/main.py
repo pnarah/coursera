@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.db.redis import init_redis_pool, close_redis_pool
-from app.api.v1 import auth, rooms, availability, pricing, hotels, bookings
+from app.api.v1 import auth, rooms, availability, pricing, hotels, bookings, payments
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.include_router(rooms.router, prefix="/api/v1", tags=["rooms"])
 app.include_router(availability.router, prefix="/api/v1", tags=["availability"])
 app.include_router(pricing.router, prefix="/api/v1", tags=["pricing"])
 app.include_router(bookings.router, prefix="/api/v1", tags=["bookings"])
+app.include_router(payments.router, prefix="/api/v1/payments", tags=["payments"])
 
 
 @app.get("/")

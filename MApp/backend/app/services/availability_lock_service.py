@@ -195,7 +195,7 @@ class AvailabilityLockService:
         
         # Validate and convert room type
         try:
-            room_type = RoomType(room_type_str.lower())
+            room_type = RoomType(room_type_str.upper())
         except ValueError:
             raise ValueError(
                 f"Invalid room type: {room_type_str}. "
@@ -217,7 +217,7 @@ class AvailabilityLockService:
         
         # Get currently locked quantity
         locked_quantity = await AvailabilityLockService._get_locked_quantity(
-            redis, hotel_id, room_type_str.lower(), check_in_date, check_out_date
+            redis, hotel_id, room_type_str.upper(), check_in_date, check_out_date
         )
         
         # Check if enough rooms available
@@ -236,7 +236,7 @@ class AvailabilityLockService:
         lock_data = {
             "lock_id": lock_id,
             "hotel_id": hotel_id,
-            "room_type": room_type_str.lower(),
+            "room_type": room_type_str.upper(),
             "check_in_date": check_in_date.isoformat(),
             "check_out_date": check_out_date.isoformat(),
             "quantity": quantity,
@@ -255,7 +255,7 @@ class AvailabilityLockService:
         await AvailabilityLockService._increment_locked_quantity(
             redis,
             hotel_id,
-            room_type_str.lower(),
+            room_type_str.upper(),
             check_in_date,
             check_out_date,
             quantity,

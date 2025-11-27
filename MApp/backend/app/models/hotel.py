@@ -72,11 +72,11 @@ class Hotel(Base):
 
 
 class RoomType(str, enum.Enum):
-    SINGLE = "single"
-    DOUBLE = "double"
-    DELUXE = "deluxe"
-    SUITE = "suite"
-    FAMILY = "family"
+    SINGLE = "SINGLE"
+    DOUBLE = "DOUBLE"
+    DELUXE = "DELUXE"
+    SUITE = "SUITE"
+    FAMILY = "FAMILY"
 
 
 class Room(Base):
@@ -237,5 +237,54 @@ class Invoice(Base):
     
     # Relationships
     booking = relationship("Booking", backref="invoice", uselist=False)
+
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    REFUNDED = "refunded"
+    CANCELLED = "cancelled"
+
+
+class PaymentMethod(str, enum.Enum):
+    CREDIT_CARD = "credit_card"
+    DEBIT_CARD = "debit_card"
+    UPI = "upi"
+    NET_BANKING = "net_banking"
+    WALLET = "wallet"
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=False, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False, index=True)
+    
+    # Payment details
+    amount = Column(Float, nullable=False)
+    currency = Column(String(3), nullable=False, default="USD")  # USD, INR, etc.
+    payment_method = Column(SQLEnum(PaymentMethod), nullable=True)
+    
+    # Gateway details
+    gateway = Column(String(50), nullable=False, default="stripe")  # stripe, razorpay, etc.
+    gateway_payment_id = Column(String(255), nullable=True, index=True)  # Stripe payment_intent_id
+    gateway_customer_id = Column(String(255), nullable=True)
+    
+    # Status tracking
+    status = Column(SQLEnum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False, index=True)
+    failure_reason = Column(Text, nullable=True)
+    
+    # Additional data
+    payment_metadata = Column(Text, nullable=True)  # JSON string for additional data
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    booking = relationship("Booking", backref="payments")
+    invoice = relationship("Invoice", backref="payments")
 
 
