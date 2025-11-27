@@ -56,46 +56,36 @@ final _router = GoRouter(
       path: '/hotels/:id',
       builder: (context, state) {
         final hotelId = state.pathParameters['id']!;
-        return HotelDetailsScreen(hotelId: int.parse(hotelId));
+        return HotelDetailsScreen(hotelId: hotelId);
       },
     ),
     GoRoute(
       path: '/booking/room-selection',
-      builder: (context, state) {
-        final extras = state.extra as Map<String, dynamic>;
-        return RoomSelectionScreen(
-          hotelId: extras['hotelId'],
-          checkIn: extras['checkIn'],
-          checkOut: extras['checkOut'],
-        );
-      },
+      builder: (context, state) => const RoomSelectionScreen(),
     ),
     GoRoute(
       path: '/booking/guest-details',
-      builder: (context, state) {
-        final extras = state.extra as Map<String, dynamic>;
-        return GuestDetailsScreen(lockId: extras['lockId']);
-      },
+      builder: (context, state) => const GuestDetailsScreen(),
     ),
     GoRoute(
       path: '/booking/confirmation/:id',
       builder: (context, state) {
         final bookingId = state.pathParameters['id']!;
-        return BookingConfirmationScreen(bookingId: int.parse(bookingId));
+        return BookingConfirmationScreen(bookingId: bookingId);
       },
     ),
     GoRoute(
       path: '/services/:bookingId',
       builder: (context, state) {
         final bookingId = state.pathParameters['bookingId']!;
-        return ServicesListScreen(bookingId: int.parse(bookingId));
+        return ServicesListScreen(bookingId: bookingId);
       },
     ),
     GoRoute(
       path: '/invoice/:bookingId',
       builder: (context, state) {
         final bookingId = state.pathParameters['bookingId']!;
-        return RunningBillScreen(bookingId: int.parse(bookingId));
+        return RunningBillScreen(bookingId: bookingId);
       },
     ),
   ],

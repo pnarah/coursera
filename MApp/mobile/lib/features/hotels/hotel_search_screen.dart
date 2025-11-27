@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/services/api_service.dart';
+import '../../core/services/secure_storage_service.dart';
 
 class HotelSearchScreen extends ConsumerStatefulWidget {
   const HotelSearchScreen({super.key});
@@ -439,12 +440,12 @@ class _HotelCard extends StatelessWidget {
   }
 }
 
-// Provider for API Service
+// Providers
+final storageServiceProvider = Provider<SecureStorageService>((ref) {
+  return SecureStorageService();
+});
+
 final apiServiceProvider = Provider<ApiService>((ref) {
   final storage = ref.read(storageServiceProvider);
   return ApiService(storage);
-});
-
-final storageServiceProvider = Provider<dynamic>((ref) {
-  throw UnimplementedError('Storage service must be provided');
 });

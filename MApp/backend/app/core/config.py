@@ -24,8 +24,17 @@ class Settings(BaseSettings):
     OTP_EXPIRE_SECONDS: int = 300  # 5 minutes
     OTP_LENGTH: int = 6
     
-    # CORS
-    CORS_ORIGINS: list = ["http://localhost:3000", "http://localhost:8080"]
+    # CORS - Allow all localhost ports for development
+    CORS_ORIGINS: list = [
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://localhost:8081",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1:8081",
+        # Add wildcard for Flutter web dev server (runs on random ports)
+        "*"
+    ]
     
     # Rate Limiting
     RATE_LIMIT_OTP_PER_MOBILE: int = 3
