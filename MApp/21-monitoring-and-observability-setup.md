@@ -18,9 +18,10 @@ Implement application metrics, logging, and tracing for critical flows.
 4. Dashboard sketches (Grafana panels list).
 
 ## Prompts You Can Use
-- "Expose Prometheus metrics from NestJS application." 
-- "Add request correlation IDs and structured JSON logging." 
-- "Instrument booking flow with OpenTelemetry spans." 
+- "Expose Prometheus metrics from FastAPI using prometheus-fastapi-instrumentator."
+- "Add request correlation IDs middleware in FastAPI with structlog."
+- "Instrument booking flow with OpenTelemetry spans in async FastAPI."
+- "Set up logging with loguru for structured async logging." 
 
 ## Acceptance Criteria
 - Metrics accessible; logs contain correlation IDs.

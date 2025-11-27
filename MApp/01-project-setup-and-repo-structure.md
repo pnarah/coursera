@@ -5,7 +5,8 @@ Establish foundational repository structure for backend and mobile apps with ini
 
 ## Prerequisites
 - Git installed
-- Node.js and Flutter (or React Native) environments ready
+- Python 3.11+ and Flutter (or React Native) environments ready
+- Docker Desktop (for PostgreSQL and Redis)
 
 ## Deliverables
 - Root README.md updated
@@ -16,14 +17,16 @@ Establish foundational repository structure for backend and mobile apps with ini
 ## Suggested Steps
 1. Create folders: backend, mobile, docs, scripts.
 2. Add root README with high-level overview.
-3. Add .gitignore for Node, Flutter.
-4. Initialize package.json in backend.
-5. Document environment setup instructions.
+3. Add .gitignore for Python, Flutter.
+4. Create backend/requirements.txt stub.
+5. Document environment setup instructions (Python 3.11+, Docker).
+6. Add docker-compose.yml for PostgreSQL and Redis.
 
 ## Prompts You Can Use
-- "Create initial folder structure for backend and mobile projects."
+- "Create initial folder structure for FastAPI backend and Flutter mobile projects."
 - "Generate a README summarizing hotel booking platform modules."
-- "Add .gitignore files for Node.js and Flutter."
+- "Add .gitignore files for Python (FastAPI) and Flutter."
+- "Create docker-compose.yml with PostgreSQL 15 and Redis 7 services."
 
 ## Acceptance Criteria
 - Repo contains logical structure enabling isolated development.

@@ -12,10 +12,32 @@ Introduce unit, integration, and load tests for critical services.
 - Load test scripts (k6/JMeter) for concurrent booking attempts
 
 ## Suggested Steps
-1. Set up Jest config (NestJS default).
-2. Write unit tests for pricing multipliers.
-3. Integration test: booking end-to-end scenario.
-4. k6 script simulating parallel lock requests.
+1. Set up pytest with pytest-asyncio for async testing
+2. Write unit tests for pricing service using pytest fixtures
+3. Create integration test fixtures (test database, async client)
+4. Integration test: booking end-to-end scenario with TestClient
+5. k6 script simulating parallel lock requests
+
+## Example Test Setup
+
+### tests/conftest.py
+```python
+import pytest
+import asyncio
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+
+@pytest.fixture(scope="session")
+def event_loop():
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture
+async def client():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
+```
 
 ## Prompts You Can Use
 - "Add Jest unit tests for dynamic pricing scenarios." 

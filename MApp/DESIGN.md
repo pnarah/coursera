@@ -24,14 +24,22 @@ A cross-platform mobile application (Android & iOS) enabling users to search hot
   - React Native: react-native-keychain
 
 ### 2.2 Backend Application
-- **Framework**: Node.js (NestJS recommended for modular domain separation) or Spring Boot / FastAPI
-- **Primary Database**: PostgreSQL (users, hotels, rooms, bookings, services, invoices, payments)
-- **Cache/Session/Locking**: Redis (OTP, sessions, room availability locks, rate limiting)
+- **Framework**: FastAPI (Python 3.11+)
+  - **Why FastAPI**: Native async/await support, automatic OpenAPI docs, Pydantic validation, high performance, excellent for microservices
+  - **Alternative considerations**: NestJS (TypeScript) for JS-heavy teams, Spring Boot (Java) for enterprise
+- **ORM**: SQLAlchemy 2.0 with async support (asyncpg driver for PostgreSQL)
+- **Primary Database**: PostgreSQL 15+ (users, hotels, rooms, bookings, services, invoices, payments)
+- **Cache/Session/Locking**: Redis 7+ (OTP, sessions, room availability locks, rate limiting)
+- **Redis Client**: redis-py with async support or aioredis
 - **Search Layer (Optional Phase 2)**: Elasticsearch for full‑text hotel search & geo queries
-- **Authentication**: JWT (access + refresh) + Redis session context
-- **OTP Delivery**: Twilio SMS / AWS SNS
-- **Payment Gateway**: Stripe / Razorpay (India) / Adyen (global) integrated with Payments Service
-- **API Documentation**: OpenAPI / Swagger
+- **Authentication**: JWT (access + refresh) using python-jose + Redis session context
+- **OTP Delivery**: Twilio SMS API / AWS SNS via boto3
+- **Payment Gateway**: Stripe SDK / Razorpay SDK (India) / Adyen SDK integrated with Payments Service
+- **API Documentation**: Auto-generated OpenAPI/Swagger via FastAPI
+- **Dependency Injection**: FastAPI's native Depends() system
+- **Background Tasks**: FastAPI BackgroundTasks + Celery with Redis broker for heavy async work
+- **Migration Tool**: Alembic for database schema versioning
+- **Validation**: Pydantic v2 for request/response models and configuration
 
 ### 2.3 Infrastructure
 - **Cloud**: AWS (recommended) / GCP / Azure
@@ -75,11 +83,64 @@ A cross-platform mobile application (Android & iOS) enabling users to search hot
 ```
 
 ### 3.2 Application Architecture Pattern
-- **Pattern**: Clean Architecture / Layered Architecture
+- **Pattern**: Clean Architecture / Layered Architecture adapted for FastAPI
+- **FastAPI Project Structure**:
+  ```
+  backend/
+  ├── alembic/                    # Database migrations
+  ├── app/
+  │   ├── main.py                 # FastAPI app instance, middleware, CORS
+  │   ├── core/
+  │   │   ├── config.py           # Pydantic Settings management
+  │   │   ├── security.py         # JWT, password hashing
+  │   │   ├── dependencies.py     # Common dependencies (DB, Redis, current user)
+  │   │   └── exceptions.py       # Custom exception handlers
+  │   ├── db/
+  │   │   ├── base.py             # SQLAlchemy declarative base
+  │   │   ├── session.py          # Async session factory
+  │   │   └── redis.py            # Redis connection pool
+  │   ├── models/                 # SQLAlchemy ORM models
+  │   │   ├── user.py
+  │   │   ├── hotel.py
+  │   │   ├── booking.py
+  │   │   └── ...
+  │   ├── schemas/                # Pydantic schemas (request/response)
+  │   │   ├── user.py
+  │   │   ├── hotel.py
+  │   │   └── ...
+  │   ├── api/                    # API routes organized by domain
+  │   │   ├── v1/
+  │   │   │   ├── auth.py
+  │   │   │   ├── hotels.py
+  │   │   │   ├── bookings.py
+  │   │   │   ├── services.py
+  │   │   │   └── payments.py
+  │   ├── services/               # Business logic layer
+  │   │   ├── auth_service.py
+  │   │   ├── otp_service.py
+  │   │   ├── hotel_service.py
+  │   │   ├── availability_service.py
+  │   │   ├── pricing_service.py
+  │   │   ├── booking_service.py
+  │   │   ├── invoice_service.py
+  │   │   └── payment_service.py
+  │   ├── repositories/           # Data access layer
+  │   │   ├── user_repository.py
+  │   │   ├── hotel_repository.py
+  │   │   └── ...
+  │   └── utils/
+  │       ├── otp.py
+  │       ├── redis_locks.py      # Distributed locking utilities
+  │       └── validators.py
+  ├── tests/
+  ├── requirements.txt
+  └── pyproject.toml
+  ```
 - **Layers**:
-  - **Presentation Layer**: UI Components, Screens
-  - **Business Logic Layer**: Services, Use Cases
-  - **Data Layer**: Repositories, API Clients, Local Storage
+  - **API Layer** (FastAPI routers): Request validation, response serialization
+  - **Service Layer**: Business logic, orchestration, transaction management
+  - **Repository Layer**: Database queries, data access patterns
+  - **Model Layer**: SQLAlchemy ORM models, database schema
 
 ## 4. Authentication & Session Management
 
@@ -384,6 +445,483 @@ final_price = base_price
         - loyalty_discount
         - promotional_discount
 ```
+
+## 6A. FastAPI Implementation Complexity & Best Practices
+
+### 6A.1 Complexity Areas & Solutions
+
+#### **1. Async Database Operations with SQLAlchemy**
+**Challenge**: SQLAlchemy 2.0 async requires careful session management and proper async context handling.
+
+**Solution**:
+```python
+# app/db/session.py
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=settings.DEBUG,
+    pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=10
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)
+
+async def get_db() -> AsyncSession:
+    async with AsyncSessionLocal() as session:
+        yield session
+```
+
+**Key Points**:
+- Use `asyncpg` driver (not psycopg2)
+- Always use `async with` for sessions
+- Set `expire_on_commit=False` to avoid lazy-loading issues
+- Use `await session.execute()` for queries, not `.query()`
+
+#### **2. Redis Distributed Locking for Inventory**
+**Challenge**: Preventing race conditions during concurrent booking attempts requires atomic operations.
+
+**Solution**:
+```python
+# app/utils/redis_locks.py
+import asyncio
+from redis.asyncio import Redis
+from typing import Optional
+import uuid
+
+class RedisLock:
+    def __init__(self, redis: Redis, key: str, timeout: int = 120):
+        self.redis = redis
+        self.key = f"lock:{key}"
+        self.timeout = timeout
+        self.token = str(uuid.uuid4())
+    
+    async def __aenter__(self):
+        while True:
+            acquired = await self.redis.set(
+                self.key, 
+                self.token, 
+                nx=True, 
+                ex=self.timeout
+            )
+            if acquired:
+                return self
+            await asyncio.sleep(0.1)
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Lua script ensures atomic delete only if we own the lock
+        lua_script = """
+        if redis.call("get", KEYS[1]) == ARGV[1] then
+            return redis.call("del", KEYS[1])
+        else
+            return 0
+        end
+        """
+        await self.redis.eval(lua_script, 1, self.key, self.token)
+
+# Usage in availability service
+async def lock_inventory(hotel_id, room_type_id, date_range):
+    lock_key = f"hotel:{hotel_id}:room_type:{room_type_id}"
+    async with RedisLock(redis_client, lock_key, timeout=120):
+        # Check availability
+        # Decrement inventory
+        # Create booking
+        pass
+```
+
+**Complexity**: Requires Lua scripting for atomic operations and proper timeout handling.
+
+#### **3. Transaction Management with Multiple Services**
+**Challenge**: Booking creation involves multiple tables (booking, guests, booking_services, invoice) and must be atomic.
+
+**Solution**:
+```python
+# app/services/booking_service.py
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+class BookingService:
+    async def create_booking(
+        self,
+        db: AsyncSession,
+        redis: Redis,
+        booking_data: BookingCreate,
+        user_id: UUID
+    ) -> Booking:
+        async with db.begin():  # Transaction context
+            # 1. Validate lock
+            lock_key = f"lock:{booking_data.hotel_id}:{booking_data.room_type_id}"
+            lock_exists = await redis.exists(lock_key)
+            if not lock_exists:
+                raise LockExpiredException()
+            
+            # 2. Create booking
+            booking = Booking(**booking_data.dict(), user_id=user_id)
+            db.add(booking)
+            await db.flush()  # Get booking.id without committing
+            
+            # 3. Add guests
+            for guest_data in booking_data.guests:
+                guest = Guest(**guest_data.dict(), booking_id=booking.id)
+                db.add(guest)
+            
+            # 4. Add pre-services
+            for service in booking_data.pre_services:
+                bs = BookingService(
+                    booking_id=booking.id,
+                    service_id=service.service_id,
+                    quantity=service.quantity
+                )
+                db.add(bs)
+            
+            # 5. Create invoice
+            invoice = await self.invoice_service.generate_invoice(db, booking.id)
+            db.add(invoice)
+            
+            # 6. Release lock
+            await redis.delete(lock_key)
+            
+            # Transaction commits here automatically
+            return booking
+```
+
+**Complexity**: Managing transaction boundaries with async, handling rollback on failure, coordinating Redis and DB state.
+
+#### **4. JWT + Redis Session Hybrid**
+**Challenge**: Maintaining stateless JWT with stateful session revocation capability.
+
+**Solution**:
+```python
+# app/core/security.py
+from jose import jwt, JWTError
+from datetime import datetime, timedelta
+
+async def create_access_token(user_id: UUID, session_id: str) -> str:
+    payload = {
+        "sub": str(user_id),
+        "session_id": session_id,
+        "exp": datetime.utcnow() + timedelta(minutes=15),
+        "type": "access"
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+async def verify_token(token: str, redis: Redis) -> dict:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("sub")
+        session_id = payload.get("session_id")
+        
+        # Check if session exists in Redis
+        session_key = f"session:{user_id}:{session_id}"
+        session_exists = await redis.exists(session_key)
+        if not session_exists:
+            raise SessionRevokedException()
+        
+        # Check token blacklist
+        blacklisted = await redis.exists(f"blacklist:{token}")
+        if blacklisted:
+            raise TokenBlacklistedException()
+        
+        return payload
+    except JWTError:
+        raise InvalidTokenException()
+
+# Dependency for protected routes
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis)
+) -> User:
+    payload = await verify_token(token, redis)
+    user = await db.get(User, UUID(payload["sub"]))
+    if not user:
+        raise UserNotFoundException()
+    return user
+```
+
+**Complexity**: Double validation (JWT signature + Redis session), blacklist management, refresh token rotation.
+
+#### **5. Background Task Orchestration**
+**Challenge**: Some operations (OTP sending, invoice PDF generation, payment webhook processing) should be async.
+
+**Solution**:
+```python
+# For lightweight tasks - FastAPI BackgroundTasks
+from fastapi import BackgroundTasks
+
+@router.post("/auth/send-otp")
+async def send_otp(
+    data: OTPRequest,
+    background_tasks: BackgroundTasks,
+    redis: Redis = Depends(get_redis)
+):
+    otp = generate_otp()
+    await redis.setex(f"otp:{data.mobile_number}", 300, otp)
+    
+    # Send SMS in background
+    background_tasks.add_task(send_sms_via_twilio, data.mobile_number, otp)
+    
+    return {"success": True}
+
+# For heavy/scheduled tasks - Celery
+# app/tasks/celery_app.py
+from celery import Celery
+
+celery_app = Celery(
+    "hotel_booking",
+    broker=settings.REDIS_URL,
+    backend=settings.REDIS_URL
+)
+
+@celery_app.task
+def generate_invoice_pdf(booking_id: str):
+    # Long-running PDF generation
+    pass
+
+@celery_app.task
+def send_booking_confirmation_email(booking_id: str):
+    pass
+
+# Usage in endpoint
+@router.post("/bookings/{booking_id}/checkout")
+async def checkout(booking_id: UUID):
+    # ... process checkout ...
+    generate_invoice_pdf.delay(str(booking_id))
+    return {"status": "completed"}
+```
+
+**Complexity**: Choosing between BackgroundTasks vs Celery, managing Celery workers, error handling in async tasks.
+
+#### **6. Pydantic Model Complexity**
+**Challenge**: Complex validation rules for nested booking data, date ranges, pricing calculations.
+
+**Solution**:
+```python
+# app/schemas/booking.py
+from pydantic import BaseModel, validator, Field
+from datetime import date, timedelta
+from typing import List, Optional
+
+class GuestCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    age: int = Field(..., ge=0, le=150)
+    gender: Optional[str]
+    id_doc_type: Optional[str]
+    id_doc_number: Optional[str]
+
+class PreServiceCreate(BaseModel):
+    service_id: UUID
+    quantity: int = Field(default=1, ge=1)
+    scheduled_for: Optional[datetime]
+
+class BookingCreate(BaseModel):
+    hotel_id: UUID
+    room_type_id: UUID
+    checkin_date: date
+    checkout_date: date
+    num_rooms: int = Field(default=1, ge=1, le=10)
+    num_guests: int = Field(..., ge=1)
+    guests: List[GuestCreate]
+    pre_services: List[PreServiceCreate] = []
+    
+    @validator('checkout_date')
+    def checkout_after_checkin(cls, v, values):
+        if 'checkin_date' in values and v <= values['checkin_date']:
+            raise ValueError('Checkout must be after checkin')
+        return v
+    
+    @validator('checkin_date')
+    def checkin_not_past(cls, v):
+        if v < date.today():
+            raise ValueError('Cannot book dates in the past')
+        return v
+    
+    @validator('guests')
+    def validate_guest_count(cls, v, values):
+        if 'num_guests' in values and len(v) != values['num_guests']:
+            raise ValueError('Guest count mismatch')
+        return v
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "hotel_id": "123e4567-e89b-12d3-a456-426614174000",
+                "room_type_id": "223e4567-e89b-12d3-a456-426614174000",
+                "checkin_date": "2025-12-01",
+                "checkout_date": "2025-12-05",
+                "num_rooms": 1,
+                "num_guests": 2,
+                "guests": [
+                    {"name": "John Doe", "age": 30, "gender": "M"},
+                    {"name": "Jane Doe", "age": 28, "gender": "F"}
+                ]
+            }
+        }
+```
+
+**Complexity**: Custom validators, nested validation, maintaining sync between ORM models and Pydantic schemas.
+
+#### **7. Database Query Optimization**
+**Challenge**: N+1 query problems, eager loading relationships, pagination.
+
+**Solution**:
+```python
+# app/repositories/hotel_repository.py
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
+class HotelRepository:
+    async def get_hotels_with_rooms(
+        self,
+        db: AsyncSession,
+        city: str,
+        checkin: date,
+        checkout: date,
+        skip: int = 0,
+        limit: int = 20
+    ):
+        # Eager load relationships to avoid N+1
+        stmt = (
+            select(Hotel)
+            .join(Hotel.location)
+            .options(
+                selectinload(Hotel.room_types),
+                selectinload(Hotel.location)
+            )
+            .where(Location.city == city)
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().all()
+    
+    async def get_available_room_count(
+        self,
+        db: AsyncSession,
+        hotel_id: UUID,
+        room_type_id: UUID,
+        checkin: date,
+        checkout: date
+    ) -> int:
+        # Complex query to check overlapping bookings
+        stmt = select(func.count(Room.id)).where(
+            Room.hotel_id == hotel_id,
+            Room.room_type_id == room_type_id,
+            Room.status == 'AVAILABLE',
+            ~Room.id.in_(
+                select(Booking.room_id).where(
+                    or_(
+                        and_(
+                            Booking.checkin_date <= checkin,
+                            Booking.checkout_date > checkin
+                        ),
+                        and_(
+                            Booking.checkin_date < checkout,
+                            Booking.checkout_date >= checkout
+                        )
+                    ),
+                    Booking.booking_status.in_(['CONFIRMED', 'COMPLETED'])
+                )
+            )
+        )
+        result = await db.execute(stmt)
+        return result.scalar_one()
+```
+
+**Complexity**: Understanding SQLAlchemy 2.0 select() API, relationship loading strategies, avoiding implicit async issues.
+
+### 6A.2 Testing Complexity
+
+#### **Async Test Setup**
+```python
+# tests/conftest.py
+import pytest
+import asyncio
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from httpx import AsyncClient
+
+@pytest.fixture(scope="session")
+def event_loop():
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture
+async def db_session():
+    engine = create_async_engine("postgresql+asyncpg://test:test@localhost/test_db")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    async with AsyncSession(engine) as session:
+        yield session
+    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+@pytest.fixture
+async def client(db_session):
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
+
+# tests/test_booking.py
+@pytest.mark.asyncio
+async def test_create_booking(client, db_session):
+    response = await client.post("/api/bookings", json={...})
+    assert response.status_code == 201
+```
+
+**Complexity**: Managing async fixtures, test database lifecycle, mocking Redis, isolating tests.
+
+### 6A.3 Performance Considerations
+
+**Connection Pooling**:
+- PostgreSQL: Pool size 20-50 (adjust based on load)
+- Redis: Connection pool with min 10, max 50
+
+**Caching Strategy**:
+- Hotel metadata: Cache for 1 hour
+- Room availability: Cache for 5 minutes with invalidation on booking
+- User sessions: 7-day TTL in Redis
+
+**API Rate Limiting**:
+```python
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+@router.post("/auth/send-otp")
+@limiter.limit("3/30minutes")
+async def send_otp(request: Request):
+    pass
+```
+
+### 6A.4 When FastAPI Becomes Complex
+
+**Use Cases Where FastAPI Shines**:
+- ✅ High I/O workloads (database, API calls)
+- ✅ Microservices with async communication
+- ✅ Real-time features (WebSocket support)
+- ✅ Rapid prototyping with auto docs
+- ✅ Data validation heavy applications
+
+**Potential Challenges**:
+- ⚠️ Async learning curve for team unfamiliar with Python async
+- ⚠️ SQLAlchemy async support still maturing (less ecosystem)
+- ⚠️ Debugging async code can be harder
+- ⚠️ Less enterprise tooling compared to Spring Boot
+- ⚠️ Type hints improve experience but add verbosity
+
+**Mitigation**:
+- Invest in team training on async/await patterns
+- Use structured logging with correlation IDs
+- Leverage FastAPI's dependency injection for testability
+- Use Pydantic for runtime validation (catches many errors early)
 
 ## 7. API Endpoints
 
@@ -908,7 +1446,7 @@ Warning: #FFC107 (Amber)
 ## 17. Team Structure Recommendation
 
 - **1 Mobile Developer** (Flutter/React Native)
-- **1 Backend Developer** (Node.js/Spring Boot)
+- **1 Backend Developer** (FastAPI/Python)
 - **1 UI/UX Designer**
 - **1 QA Engineer**
 - **1 DevOps Engineer** (part-time)

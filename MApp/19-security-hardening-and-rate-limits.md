@@ -19,9 +19,10 @@ Add critical security measures: rate limits, input validation, token practices, 
 4. Log suspicious events.
 
 ## Prompts You Can Use
-- "Add rate limiting to OTP send endpoint using Redis counters." 
-- "Implement global DTO validation in NestJS." 
-- "Configure helmet and strict CORS rules." 
+- "Add rate limiting to OTP send endpoint using slowapi and Redis."
+- "Implement global request validation in FastAPI using Pydantic."
+- "Configure CORS middleware with strict origins in FastAPI."
+- "Add security headers using fastapi-security-headers or custom middleware." 
 
 ## Acceptance Criteria
 - Excessive requests receive 429 errors.

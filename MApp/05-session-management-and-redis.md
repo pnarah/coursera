@@ -20,9 +20,10 @@ Persist and manage user sessions with Redis for concurrent device logins.
 4. Extend logout to remove session and blacklist access token.
 
 ## Prompts You Can Use
-- "Add session management service in NestJS using Redis keys."
-- "Implement sessions list and revoke endpoints." 
-- "Integrate session creation into OTP verify flow."
+- "Add session management service in FastAPI using Redis hashes."
+- "Implement sessions list and revoke endpoints with FastAPI dependencies."
+- "Integrate session creation into OTP verify flow with JWT claims."
+- "Create FastAPI dependency to get current user from JWT and Redis session."
 
 ## Acceptance Criteria
 - Multiple sessions visible for same user.
