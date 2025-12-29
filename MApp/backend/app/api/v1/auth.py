@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
-from app.schemas.auth import OTPRequest, OTPVerify, TokenResponse, OTPResponse
+from app.schemas.auth import OTPRequest, OTPVerify, TokenResponse, OTPResponse, RefreshTokenRequest, UserResponse
 from app.schemas.session import SessionListResponse, SessionResponse
 from app.services.otp_service import OTPService
 from app.services.session_service import SessionService
-from app.core.security import create_access_token, create_refresh_token
+from app.core.security import create_access_token, create_refresh_token, verify_token
 from app.db.redis import get_redis
 from app.db.session import get_db
 from app.core.config import settings
@@ -87,8 +88,8 @@ async def verify_otp(
     """
     Verify OTP and return JWT tokens with session creation.
     
-    Returns access token (15 min) and refresh token (7 days).
-    Creates a new session in Redis for session management.
+    Returns access token (60 min) and refresh token (30 days).
+    Creates a new session in Redis and PostgreSQL for advanced session management.
     Creates user if doesn't exist.
     """
     # Verify OTP
@@ -112,55 +113,176 @@ async def verify_otp(
     result = await db.execute(user_query)
     user = result.scalar_one_or_none()
     
+    is_new_user = False
     if not user:
         # Create new user
         user = User(
             mobile_number=request_data.mobile_number,
             country_code="+1",  # Default country code
-            is_active=True
+            is_active=True,
+            last_login=datetime.utcnow()
         )
         db.add(user)
-        await db.commit()
-        await db.refresh(user)
+        is_new_user = True
+    else:
+        # Update last login
+        user.last_login = datetime.utcnow()
     
-    user_id = request_data.mobile_number
+    await db.commit()
+    await db.refresh(user)
     
-    # Create session
-    ip_address = http_request.client.host if http_request.client else None
-    session_id = await SessionService.create_session(
+    # Generate tokens first
+    temp_user_data = {
+        "sub": user.mobile_number,
+        "user_id": user.id,
+        "mobile": user.mobile_number,
+        "role": user.role.value,
+        "hotel_id": user.hotel_id,
+        "device": request_data.device_info,
+    }
+    
+    access_token = create_access_token(temp_user_data)
+    refresh_token = create_refresh_token({
+        "sub": user.mobile_number,
+        "user_id": user.id,
+    })
+    
+    # Create session with new SessionService
+    session_service = SessionService(db)
+    session = await session_service.create_session(
         redis=redis,
-        user_id=user_id,
-        device_info=request_data.device_info,
-        ip_address=ip_address
+        user=user,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        request=http_request
     )
     
-    # Generate tokens with session_id
+    # Regenerate tokens with session_id
     user_data = {
-        "sub": user_id,
-        "mobile": user_id,
+        "sub": user.mobile_number,
+        "user_id": user.id,
+        "mobile": user.mobile_number,
+        "role": user.role.value,
+        "hotel_id": user.hotel_id,
         "device": request_data.device_info,
-        "session_id": session_id
+        "session_id": str(session.id)
     }
     
     access_token = create_access_token(user_data)
-    refresh_token = create_refresh_token({"sub": user_id, "session_id": session_id})
-    
-    # Update session with refresh token
-    session = await SessionService.get_session(redis, user_id, session_id)
-    if session:
-        session["refresh_token"] = refresh_token
-        import json
-        await redis.setex(
-            f"session:{user_id}:{session_id}",
-            SessionService.SESSION_TTL,
-            json.dumps(session)
-        )
+    refresh_token = create_refresh_token({
+        "sub": user.mobile_number,
+        "user_id": user.id,
+        "session_id": str(session.id)
+    })
     
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
         token_type="bearer",
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user=UserResponse(
+            id=user.id,
+            mobile_number=user.mobile_number,
+            country_code=user.country_code,
+            full_name=user.full_name,
+            email=user.email,
+            role=user.role.value,
+            hotel_id=user.hotel_id,
+            is_active=user.is_active
+        ),
+        action="register" if is_new_user else "login"
+    )
+
+
+@router.post("/refresh-token", response_model=TokenResponse, status_code=status.HTTP_200_OK)
+async def refresh_access_token(
+    request_data: RefreshTokenRequest,
+    redis: Redis = Depends(get_redis),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Refresh access token using refresh token.
+    
+    Returns new access token (60 min) with same refresh token.
+    """
+    # Verify refresh token
+    payload = verify_token(request_data.refresh_token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token"
+        )
+    
+    # Check token type
+    if payload.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type. Expected refresh token"
+        )
+    
+    user_id = payload.get("sub")
+    session_id = payload.get("session_id")
+    
+    if not user_id or not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+    
+    # Verify session still exists
+    session = await SessionService.get_session(redis, user_id, session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired or invalid"
+        )
+    
+    # Get user from database
+    from sqlalchemy import select
+    from app.models.hotel import User
+    
+    user_query = select(User).where(User.mobile_number == user_id)
+    result = await db.execute(user_query)
+    user = result.scalar_one_or_none()
+    
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive"
+        )
+    
+    # Generate new access token with same user data
+    user_data = {
+        "sub": user_id,
+        "user_id": user.id,
+        "mobile": user_id,
+        "role": user.role.value,
+        "hotel_id": user.hotel_id,
+        "device": session.get("device_info", "unknown"),
+        "session_id": session_id
+    }
+    
+    new_access_token = create_access_token(user_data)
+    
+    # Update last activity
+    await SessionService.update_last_active(redis, user_id, session_id)
+    
+    return TokenResponse(
+        access_token=new_access_token,
+        refresh_token=request_data.refresh_token,  # Return same refresh token
+        token_type="bearer",
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user=UserResponse(
+            id=user.id,
+            mobile_number=user.mobile_number,
+            country_code=user.country_code,
+            full_name=user.full_name,
+            email=user.email,
+            role=user.role.value,
+            hotel_id=user.hotel_id,
+            is_active=user.is_active
+        ),
+        action="refresh"
     )
 
 

@@ -29,11 +29,31 @@ class OTPVerify(BaseModel):
         return v
 
 
+class UserResponse(BaseModel):
+    id: int
+    mobile_number: str
+    country_code: str
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    role: str
+    hotel_id: Optional[int] = None
+    is_active: bool
+    
+    class Config:
+        from_attributes = True
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int  # seconds
+    user: UserResponse
+    action: str  # "login" or "register"
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 
 class OTPResponse(BaseModel):

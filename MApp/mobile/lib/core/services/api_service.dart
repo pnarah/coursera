@@ -68,6 +68,11 @@ class ApiService {
   // HOTEL SEARCH APIs
   // ====================
 
+  Future<Map<String, dynamic>> getCities() async {
+    final response = await _dio.get('/hotels/cities');
+    return response.data;
+  }
+
   Future<Map<String, dynamic>> searchHotels({
     String? city,
     DateTime? checkIn,

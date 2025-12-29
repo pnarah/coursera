@@ -17,12 +17,14 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # 1 hour
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30  # 30 days
     
     # OTP
-    OTP_EXPIRE_SECONDS: int = 300  # 5 minutes
+    OTP_EXPIRE_SECONDS: int = 600  # 10 minutes
     OTP_LENGTH: int = 6
+    OTP_MAX_ATTEMPTS: int = 3
+    OTP_RATE_LIMIT_SECONDS: int = 1800  # 30 minutes
     
     # CORS - Allow all localhost ports for development
     CORS_ORIGINS: list = [
@@ -39,6 +41,23 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_OTP_PER_MOBILE: int = 3
     RATE_LIMIT_WINDOW_SECONDS: int = 1800  # 30 minutes
+    
+    # Session Management (TASK_03)
+    SESSION_TIMEOUT_GUEST: int = 86400  # 24 hours
+    SESSION_TIMEOUT_EMPLOYEE: int = 28800  # 8 hours
+    SESSION_TIMEOUT_VENDOR: int = 43200  # 12 hours
+    SESSION_TIMEOUT_ADMIN: int = 14400  # 4 hours
+    
+    MAX_SESSIONS_GUEST: int = 5
+    MAX_SESSIONS_EMPLOYEE: int = 2
+    MAX_SESSIONS_VENDOR: int = 3
+    MAX_SESSIONS_ADMIN: int = 2
+    
+    SESSION_REFRESH_THRESHOLD: int = 300  # 5 minutes
+    
+    # JWT
+    JWT_SECRET_KEY: str = "your-secret-key-change-in-production-min-32-chars"
+    JWT_ALGORITHM: str = "HS256"
     
     class Config:
         env_file = ".env"

@@ -61,10 +61,6 @@ class _HotelDetailsScreenState extends ConsumerState<HotelDetailsScreen> {
     final guests = extras?['guests'] as int? ?? 1;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_hotel?['name'] ?? 'Hotel Details'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
@@ -87,150 +83,228 @@ class _HotelDetailsScreenState extends ConsumerState<HotelDetailsScreen> {
                     ],
                   ),
                 )
-              : SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Hotel Image
-                      Container(
-                        height: 250,
-                        width: double.infinity,
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.hotel, size: 80, color: Colors.grey),
-                      ),
-
-                      // Hotel Info
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+              : CustomScrollView(
+                  slivers: [
+                    // Hotel Image Header
+                    SliverAppBar(
+                      expandedHeight: 300,
+                      pinned: true,
+                      flexibleSpace: FlexibleSpaceBar(
+                        title: Text(
+                          _hotel?['name'] ?? 'Hotel Details',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                offset: Offset(0, 1),
+                                blurRadius: 3,
+                                color: Colors.black45,
+                              ),
+                            ],
+                          ),
+                        ),
+                        background: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            Text(
-                              _hotel?['name'] ?? 'Unknown Hotel',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Location
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on, size: 20, color: Colors.grey),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    '${_hotel?['address'] ?? ''}, ${_hotel?['city'] ?? ''}, ${_hotel?['state'] ?? ''} ${_hotel?['zipcode'] ?? ''}',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Rating
-                            if (_hotel?['rating'] != null)
-                              Row(
-                                children: [
-                                  const Icon(Icons.star, size: 20, color: Colors.amber),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _hotel!['rating'].toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            const SizedBox(height: 16),
-
-                            // Description
-                            if (_hotel?['description'] != null) ...[
-                              const Text(
-                                'About',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Colors.blue.shade300,
+                                    Colors.purple.shade400,
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _hotel!['description'],
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // Amenities
-                            if (_hotel?['amenities'] != null) ...[
-                              const Text(
-                                'Amenities',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: (_hotel!['amenities'] as List)
-                                    .map((amenity) => Chip(
-                                          label: Text(amenity.toString()),
-                                        ))
-                                    .toList(),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // Rooms Section
-                            const Divider(),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'Available Rooms',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                              child: const Icon(
+                                Icons.hotel_rounded,
+                                size: 100,
+                                color: Colors.white70,
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withOpacity(0.7),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
+                    ),
+                    
+                    // Hotel Content
+                    SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
 
-                      // Room Cards
-                      if (_rooms.isEmpty)
-                        const Padding(
+                          // Hotel Info Card
+                          Container(
+                            margin: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 10,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Location
+                                Row(
+                                  children: [
+                                    Icon(Icons.location_on, size: 22, color: Colors.red.shade400),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '${_hotel?['address'] ?? ''}, ${_hotel?['city'] ?? ''}, ${_hotel?['state'] ?? ''} ${_hotel?['zipcode'] ?? ''}',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Rating
+                                if (_hotel?['rating'] != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.shade50,
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.star, size: 22, color: Colors.amber),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _hotel!['rating'].toString(),
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Text(
+                                          'Rating',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                const SizedBox(height: 16),
+
+                                // Description
+                                if (_hotel?['description'] != null) ...[
+                                  const Text(
+                                    'About',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _hotel!['description'],
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 16),
+                                ],
+
+                                // Amenities
+                                if (_hotel?['amenities'] != null) ...[
+                                  const Text(
+                                    'Amenities',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: (_hotel!['amenities'] as List)
+                                        .map((amenity) => Chip(
+                                              label: Text(amenity.toString()),
+                                            ))
+                                        .toList(),
+                                  ),
+                                  const SizedBox(height: 16),
+                                ],
+
+                                // Rooms Section
+                                const Divider(),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Available Rooms',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Room Cards
+                    if (_rooms.isEmpty)
+                      const SliverToBoxAdapter(
+                        child: Padding(
                           padding: EdgeInsets.all(16),
                           child: Center(
                             child: Text('No rooms available'),
                           ),
-                        )
-                      else
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _rooms.length,
-                          itemBuilder: (context, index) {
+                        ),
+                      )
+                    else
+                      SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
                             final room = _rooms[index];
-                            return _RoomCard(
-                              room: room,
-                              hotelId: int.parse(widget.hotelId),
-                              checkIn: checkIn,
-                              checkOut: checkOut,
-                              guests: guests,
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: _RoomCard(
+                                room: room,
+                                hotelId: int.parse(widget.hotelId),
+                                checkIn: checkIn,
+                                checkOut: checkOut,
+                                guests: guests,
+                              ),
                             );
                           },
+                          childCount: _rooms.length,
                         ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+                      ),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: 24),
+                    ),
+                  ],
                 ),
     );
   }

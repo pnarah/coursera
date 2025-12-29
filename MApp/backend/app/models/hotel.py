@@ -1,16 +1,19 @@
-from sqlalchemy import Column, String, Integer, Float, Boolean, Text, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, String, Integer, Float, Boolean, Text, DateTime, ForeignKey, Enum as SQLEnum, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
 import enum
+import uuid
 
 from app.db.base import Base
 
 
 class UserRole(str, enum.Enum):
-    GUEST = "guest"
-    ADMIN = "admin"
-    STAFF = "staff"
+    GUEST = "GUEST"
+    HOTEL_EMPLOYEE = "HOTEL_EMPLOYEE"
+    VENDOR_ADMIN = "VENDOR_ADMIN"
+    SYSTEM_ADMIN = "SYSTEM_ADMIN"
 
 
 class User(Base):
@@ -22,12 +25,83 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=True, index=True)
     full_name = Column(String(255), nullable=True)
     role = Column(SQLEnum(UserRole), default=UserRole.GUEST, nullable=False)
+    hotel_id = Column(Integer, ForeignKey("hotels.id"), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    last_login = Column(DateTime(timezone=True), nullable=True)
+    
+    # RBAC fields (added in TASK_02)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    password_hash = Column(String(255), nullable=True)  # For email/password login (future)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
     # Relationships
     bookings = relationship("Booking", back_populates="user")
+    hotel = relationship("Hotel", foreign_keys=[hotel_id])
+    
+    # RBAC relationships
+    permissions = relationship("HotelEmployeePermission", back_populates="user", foreign_keys="HotelEmployeePermission.user_id")
+    granted_permissions = relationship("HotelEmployeePermission", back_populates="granter", foreign_keys="HotelEmployeePermission.granted_by")
+    audit_logs = relationship("AuditLog", back_populates="user")
+    creator = relationship("User", remote_side=[id], foreign_keys=[created_by])
+    
+    # Session relationship (TASK_03)
+    sessions = relationship("UserSession", back_populates="user")
+
+
+class UserSession(Base):
+    """Session tracking for multi-device support and security"""
+    __tablename__ = "user_sessions"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    device_info = Column(Text, nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_activity = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    invalidated_at = Column(DateTime(timezone=True), nullable=True)
+    invalidation_reason = Column(String(100), nullable=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="sessions")
+
+
+class HotelEmployeePermission(Base):
+    """Individual permissions granted to hotel employees beyond their role's default permissions"""
+    __tablename__ = "hotel_employee_permissions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    permission = Column(String(100), nullable=False, index=True)
+    granted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    granted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="permissions", foreign_keys=[user_id])
+    granter = relationship("User", back_populates="granted_permissions", foreign_keys=[granted_by])
+
+
+class AuditLog(Base):
+    """Audit log for tracking all significant actions in the system"""
+    __tablename__ = "audit_log"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    action = Column(String(100), nullable=False, index=True)
+    resource_type = Column(String(50), nullable=False, index=True)
+    resource_id = Column(String(100), nullable=True, index=True)
+    details = Column(JSON, nullable=True)
+    ip_address = Column(String(50), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="audit_logs")
 
 
 class Location(Base):

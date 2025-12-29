@@ -35,6 +35,14 @@ async def seed_locations():
         },
         {
             "country": "USA",
+            "state": "California",
+            "city": "San Francisco",
+            "postal_code": "94102",
+            "timezone": "America/Los_Angeles",
+            "is_active": True,
+        },
+        {
+            "country": "USA",
             "state": "Illinois",
             "city": "Chicago",
             "postal_code": "60601",
@@ -141,11 +149,40 @@ async def seed_hotels(locations):
             "check_out_time": "11:00",
             "is_active": True,
         },
+        # San Francisco Hotels
+        {
+            "name": "Golden Gate Grand Hotel",
+            "description": "Luxury hotel with stunning Golden Gate Bridge views",
+            "location_id": locations[2].id,
+            "address": "500 Post St, San Francisco, CA 94102",
+            "latitude": 37.7875,
+            "longitude": -122.4083,
+            "star_rating": 5,
+            "contact_number": "+1-415-555-0250",
+            "email": "info@goldengategrand.com",
+            "check_in_time": "15:00",
+            "check_out_time": "12:00",
+            "is_active": True,
+        },
+        {
+            "name": "Fisherman's Wharf Inn",
+            "description": "Charming hotel near Fisherman's Wharf and Pier 39",
+            "location_id": locations[2].id,
+            "address": "2655 Hyde St, San Francisco, CA 94109",
+            "latitude": 37.8080,
+            "longitude": -122.4177,
+            "star_rating": 4,
+            "contact_number": "+1-415-555-0251",
+            "email": "reservations@fishermenswharfinn.com",
+            "check_in_time": "15:00",
+            "check_out_time": "11:00",
+            "is_active": True,
+        },
         # Chicago Hotels
         {
             "name": "Magnificent Mile Hotel",
             "description": "Upscale hotel on Michigan Avenue",
-            "location_id": locations[2].id,
+            "location_id": locations[3].id,
             "address": "555 N Michigan Ave, Chicago, IL 60611",
             "latitude": 41.8919,
             "longitude": -87.6256,
@@ -160,7 +197,7 @@ async def seed_hotels(locations):
         {
             "name": "South Beach Paradise",
             "description": "Trendy hotel in the heart of South Beach",
-            "location_id": locations[3].id,
+            "location_id": locations[4].id,
             "address": "888 Ocean Drive, Miami Beach, FL 33139",
             "latitude": 25.7907,
             "longitude": -80.1300,
@@ -175,7 +212,7 @@ async def seed_hotels(locations):
         {
             "name": "Pike Place Boutique Hotel",
             "description": "Boutique hotel near Pike Place Market",
-            "location_id": locations[4].id,
+            "location_id": locations[5].id,
             "address": "999 Pike St, Seattle, WA 98101",
             "latitude": 47.6097,
             "longitude": -122.3421,
@@ -266,20 +303,29 @@ async def seed_rooms(hotels):
         room_number = 100
 
     async with AsyncSessionLocal() as session:
-        # Check if rooms already exist
-        result = await session.execute(select(Room))
-        existing_rooms = result.scalars().all()
+        # Check which hotels already have rooms
+        result = await session.execute(select(Room.hotel_id).distinct())
+        hotels_with_rooms = {row[0] for row in result.all()}
         
-        if existing_rooms:
-            print(f"Rooms already seeded ({len(existing_rooms)} rooms exist). Skipping...")
+        # Filter to only add rooms for hotels that don't have them
+        new_rooms_data = [r for r in rooms_data if r["hotel_id"] not in hotels_with_rooms]
+        
+        if not new_rooms_data:
+            result = await session.execute(select(Room))
+            existing_rooms = result.scalars().all()
+            print(f"All hotels already have rooms ({len(existing_rooms)} rooms exist). Skipping...")
             return existing_rooms
-
-        rooms = [Room(**data) for data in rooms_data]
+        
+        rooms = [Room(**data) for data in new_rooms_data]
         session.add_all(rooms)
         await session.commit()
         
-        print(f"✓ Seeded {len(rooms)} rooms")
-        return rooms
+        # Get all rooms to return
+        result = await session.execute(select(Room))
+        all_rooms = result.scalars().all()
+        
+        print(f"✓ Seeded {len(rooms)} new rooms (total: {len(all_rooms)} rooms)")
+        return all_rooms
 
 
 async def seed_services(hotels):

@@ -8,10 +8,13 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from app.db.session import get_db
 from app.schemas.hotel import HotelSearchParams, HotelSearchResponse, HotelDetailResponse, LocationResponse
+from app.schemas.location import CitiesResponse, CityInfo
 from app.services.hotel_service import HotelService
+from app.models.hotel import Location, Hotel
 
 
 router = APIRouter(prefix="/hotels", tags=["hotels"])
@@ -91,6 +94,68 @@ async def search_hotels(
     # Execute search
     hotel_service = HotelService(db)
     return await hotel_service.search_hotels(params)
+
+
+@router.get(
+    "/cities",
+    response_model=CitiesResponse,
+    summary="Get all cities with hotels",
+    description="""
+    Get a list of all cities that have hotels available.
+    
+    This endpoint is useful for:
+    - Displaying city selection cards on landing pages
+    - Populating city dropdown menus
+    - Understanding geographic coverage
+    
+    Returns cities with the number of hotels in each location.
+    """
+)
+async def get_cities(
+    db: AsyncSession = Depends(get_db)
+) -> CitiesResponse:
+    """
+    Get all unique cities with active hotels.
+    
+    Args:
+        db: Database session
+        
+    Returns:
+        CitiesResponse with list of cities and hotel counts
+    """
+    # Query to get cities with hotel counts
+    query = (
+        select(
+            Location.city,
+            Location.state,
+            Location.country,
+            func.count(Hotel.id).label("hotel_count")
+        )
+        .join(Hotel, Hotel.location_id == Location.id)
+        .where(Hotel.is_active == True)
+        .where(Location.is_active == True)
+        .group_by(Location.city, Location.state, Location.country)
+        .order_by(Location.country, Location.state, Location.city)
+    )
+    
+    result = await db.execute(query)
+    cities_data = result.all()
+    
+    # Build response
+    cities = [
+        CityInfo(
+            city=row.city,
+            state=row.state,
+            country=row.country,
+            hotel_count=row.hotel_count
+        )
+        for row in cities_data
+    ]
+    
+    return CitiesResponse(
+        cities=cities,
+        total=len(cities)
+    )
 
 
 @router.get(

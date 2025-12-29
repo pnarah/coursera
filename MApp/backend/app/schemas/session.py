@@ -9,11 +9,12 @@ class SessionCreate(BaseModel):
 
 
 class SessionResponse(BaseModel):
-    session_id: str
+    id: str
     device_info: str
     ip_address: Optional[str]
     created_at: datetime
-    last_active: datetime
+    last_activity: datetime
+    expires_at: datetime
     is_current: bool = False
 
 
