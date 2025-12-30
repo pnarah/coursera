@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     ]
     
     # Rate Limiting
-    RATE_LIMIT_OTP_PER_MOBILE: int = 3
-    RATE_LIMIT_WINDOW_SECONDS: int = 1800  # 30 minutes
+    RATE_LIMIT_OTP_PER_MOBILE: int = 100  # Increased for testing
+    RATE_LIMIT_WINDOW_SECONDS: int = 300  # 5 minutes (reduced for testing)
     
     # Session Management (TASK_03)
     SESSION_TIMEOUT_GUEST: int = 86400  # 24 hours

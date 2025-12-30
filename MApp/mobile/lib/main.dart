@@ -7,11 +7,19 @@ import 'features/authentication/login_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/hotels/hotel_search_screen.dart';
 import 'features/hotels/hotel_details_screen.dart';
+import 'features/hotels/add_hotel_screen.dart';
 import 'features/booking/room_selection_screen.dart';
 import 'features/booking/guest_details_screen.dart';
 import 'features/booking/booking_confirmation_screen.dart';
 import 'features/services/services_list_screen.dart';
 import 'features/invoice/running_bill_screen.dart';
+import 'features/dashboard/guest/guest_dashboard_screen.dart';
+import 'features/dashboard/employee/employee_dashboard_screen.dart';
+import 'features/dashboard/vendor/vendor_dashboard_screen.dart';
+import 'features/dashboard/admin/admin_dashboard_screen.dart';
+import 'features/users/create_vendor_screen.dart';
+import 'features/users/create_employee_screen.dart';
+import 'features/sessions/sessions_list_screen.dart';
 
 void main() {
   runApp(
@@ -117,6 +125,59 @@ class MAppApplication extends StatelessWidget {
 
 final _router = GoRouter(
   initialLocation: '/login',
+  redirect: (context, state) async {
+    final storage = SecureStorageService();
+    final isLoggedIn = await storage.isLoggedIn();
+    final userRole = await storage.getUserRole();
+    final currentPath = state.uri.path;
+
+    // If not logged in and trying to access protected routes, redirect to login
+    if (!isLoggedIn && currentPath != '/login') {
+      return '/login';
+    }
+
+    // If logged in and on login page, redirect to dashboard
+    if (isLoggedIn && currentPath == '/login') {
+      return await storage.getRoleDashboardRoute();
+    }
+
+    // Route guards for dashboard routes - check role permissions
+    if (currentPath.startsWith('/dashboard/')) {
+      if (!isLoggedIn) return '/login';
+      
+      // Check role-specific access
+      if (currentPath == '/dashboard/guest' && userRole != 'GUEST') {
+        return await storage.getRoleDashboardRoute();
+      }
+      if (currentPath == '/dashboard/employee' && userRole != 'HOTEL_EMPLOYEE') {
+        return await storage.getRoleDashboardRoute();
+      }
+      if (currentPath == '/dashboard/vendor' && userRole != 'VENDOR_ADMIN') {
+        return await storage.getRoleDashboardRoute();
+      }
+      if (currentPath == '/dashboard/admin' && userRole != 'SYSTEM_ADMIN') {
+        return await storage.getRoleDashboardRoute();
+      }
+    }
+
+    // Route guards for admin-only routes
+    if (currentPath.startsWith('/admin/')) {
+      if (!isLoggedIn) return '/login';
+      if (userRole != 'SYSTEM_ADMIN') {
+        return await storage.getRoleDashboardRoute();
+      }
+    }
+
+    // Route guards for vendor routes
+    if (currentPath.startsWith('/vendor/')) {
+      if (!isLoggedIn) return '/login';
+      if (userRole != 'VENDOR_ADMIN') {
+        return await storage.getRoleDashboardRoute();
+      }
+    }
+
+    return null; // No redirect needed
+  },
   routes: [
     GoRoute(
       path: '/login',
@@ -125,6 +186,73 @@ final _router = GoRouter(
     GoRoute(
       path: '/home',
       builder: (context, state) => const HomeScreen(),
+    ),
+    // Dashboard routes (role-based)
+    GoRoute(
+      path: '/dashboard',
+      builder: (context, state) {
+        // TODO: Determine user role from auth state and route accordingly
+        // For now, returning guest dashboard as default
+        return const GuestDashboardScreen();
+      },
+    ),
+    GoRoute(
+      path: '/dashboard/guest',
+      builder: (context, state) => const GuestDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/dashboard/employee',
+      builder: (context, state) => const EmployeeDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/dashboard/vendor',
+      builder: (context, state) => const VendorDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/dashboard/admin',
+      builder: (context, state) => const AdminDashboardScreen(),
+    ),
+    // User management routes
+    GoRoute(
+      path: '/admin/create-vendor',
+      builder: (context, state) => const CreateVendorScreen(
+        userRole: 'SYSTEM_ADMIN',
+      ),
+    ),
+    GoRoute(
+      path: '/vendor/create-vendor',
+      builder: (context, state) {
+        final vendorHotelId = state.uri.queryParameters['hotelId'];
+        return CreateVendorScreen(
+          userRole: 'VENDOR_ADMIN',
+          vendorHotelId: vendorHotelId != null ? int.parse(vendorHotelId) : null,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin/create-employee',
+      builder: (context, state) => const CreateEmployeeScreen(
+        userRole: 'SYSTEM_ADMIN',
+      ),
+    ),
+    GoRoute(
+      path: '/vendor/create-employee',
+      builder: (context, state) {
+        final vendorHotelId = state.uri.queryParameters['hotelId'];
+        return CreateEmployeeScreen(
+          userRole: 'VENDOR_ADMIN',
+          vendorHotelId: vendorHotelId != null ? int.parse(vendorHotelId) : null,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/vendor/add-hotel',
+      builder: (context, state) => const AddHotelScreen(),
+    ),
+    // Session management
+    GoRoute(
+      path: '/sessions',
+      builder: (context, state) => const SessionsListScreen(),
     ),
     GoRoute(
       path: '/hotels/search',

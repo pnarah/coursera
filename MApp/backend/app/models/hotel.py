@@ -29,6 +29,11 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     last_login = Column(DateTime(timezone=True), nullable=True)
     
+    # Vendor fields (TASK_06)
+    vendor_approved = Column(Boolean, default=False, nullable=False)
+    approval_date = Column(DateTime(timezone=True), nullable=True)
+    approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    
     # RBAC fields (added in TASK_02)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     password_hash = Column(String(255), nullable=True)  # For email/password login (future)
@@ -49,6 +54,15 @@ class User(Base):
     
     # Session relationship (TASK_03)
     sessions = relationship("UserSession", back_populates="user")
+    
+    # Notification relationships (TASK_05)
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    notification_preferences = relationship("UserNotificationPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    
+    # Vendor/Employee relationships (TASK_06)
+    vendor_requests = relationship("VendorApprovalRequest", foreign_keys="VendorApprovalRequest.user_id", back_populates="user", cascade="all, delete-orphan")
+    employee_assignments = relationship("HotelEmployee", foreign_keys="HotelEmployee.user_id", back_populates="user", cascade="all, delete-orphan")
+    approver = relationship("User", remote_side=[id], foreign_keys=[approved_by])
 
 
 class UserSession(Base):
@@ -136,6 +150,10 @@ class Hotel(Base):
     check_in_time = Column(String(10), nullable=False, default="14:00")  # HH:MM
     check_out_time = Column(String(10), nullable=False, default="11:00")  # HH:MM
     is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Subscription fields (TASK_04) - Note: subscription_id removed, using relationship only
+    is_subscription_active = Column(Boolean, default=False, nullable=False)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
@@ -143,6 +161,8 @@ class Hotel(Base):
     location = relationship("Location", back_populates="hotels")
     rooms = relationship("Room", back_populates="hotel")
     services = relationship("Service", back_populates="hotel")
+    subscriptions = relationship("VendorSubscription", back_populates="hotel", foreign_keys="VendorSubscription.hotel_id")
+    employees = relationship("HotelEmployee", back_populates="hotel", cascade="all, delete-orphan")
 
 
 class RoomType(str, enum.Enum):

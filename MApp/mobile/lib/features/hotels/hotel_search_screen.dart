@@ -62,12 +62,6 @@ class _HotelSearchScreenState extends ConsumerState<HotelSearchScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _loadCities();
-  }
-
-  @override
   void dispose() {
     _cityController.dispose();
     super.dispose();
@@ -1295,13 +1289,3 @@ class _HotelCard extends StatelessWidget {
     );
   }
 }
-
-// Providers
-final storageServiceProvider = Provider<SecureStorageService>((ref) {
-  return SecureStorageService();
-});
-
-final apiServiceProvider = Provider<ApiService>((ref) {
-  final storage = ref.read(storageServiceProvider);
-  return ApiService(storage);
-});

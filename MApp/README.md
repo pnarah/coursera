@@ -127,7 +127,51 @@ Work through tasks 01-23 sequentially. Each task includes:
 ### 4. Reference Implementation Patterns
 Use [FASTAPI-IMPLEMENTATION-PATTERNS.md](FASTAPI-IMPLEMENTATION-PATTERNS.md) as a code reference guide.
 
-## 📊 Complexity Assessment
+## � System Admin Login Credentials
+
+For testing and development, system accounts have been created for different user roles:
+
+### **System Administrator**
+- 📱 **Mobile Number**: `8888888888`
+- 🌍 **Country Code**: `+1`
+- 👤 **Full Name**: System Administrator
+- 📧 **Email**: admin@mapp.com
+- 🎭 **Role**: SYSTEM_ADMIN
+
+**Login Steps:**
+1. Open the MApp mobile application
+2. Enter mobile number: `8888888888`
+3. Click 'Send OTP'
+4. Enter OTP: `123456` (Fixed OTP in DEBUG mode)
+5. You'll be automatically redirected to `/dashboard/admin`
+
+### **Vendor Admin (For Testing Vendor Dashboard)**
+- 📱 **Mobile Number**: `9999999999`
+- 🌍 **Country Code**: `+1`
+- 👤 **Full Name**: Test Vendor Admin
+- 📧 **Email**: vendor@test.com
+- 🎭 **Role**: VENDOR_ADMIN
+- 🏨 **Hotels**: Grand Plaza Hotel (12 rooms, 3 employees), Sunset Resort & Spa (12 rooms, 3 employees)
+
+**Login Steps:**
+1. Open the MApp mobile application
+2. Enter mobile number: `9999999999`
+3. Click 'Send OTP'
+4. Enter OTP: `123456` (Fixed OTP in DEBUG mode)
+5. You'll be automatically redirected to `/dashboard/vendor`
+
+**Platform Dashboard Metrics:**
+- Total Users: 13
+- Total Vendors: 1  
+- Total Hotels: 11
+- Active Subscriptions: 2
+- Expired Subscriptions: 0
+- New Users This Week: Varies
+- Pending Vendor Requests: 0
+
+**Note**: In DEBUG mode, the OTP is always `123456` for testing purposes. The platform metrics are calculated from real database data and cached for 1 hour for performance.
+
+## �📊 Complexity Assessment
 
 | Component | Complexity | Time (Senior Dev) | Time (Junior Dev) |
 |-----------|-----------|-------------------|-------------------|

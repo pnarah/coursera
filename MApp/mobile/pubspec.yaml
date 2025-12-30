@@ -16,6 +16,12 @@ dependencies:
   # Networking
   dio: ^5.4.0
   
+  # JWT Handling
+  jwt_decoder: ^2.0.1
+  
+  # Internationalization & Date Formatting
+  intl: ^0.18.1
+  
   # Routing
   go_router: ^12.1.3
   

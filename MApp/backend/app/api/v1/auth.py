@@ -46,7 +46,7 @@ async def send_otp(
         )
     
     # Generate OTP (use fixed OTP for test number in debug mode)
-    if settings.DEBUG and request.mobile_number == "5551234567":
+    if settings.DEBUG and request.mobile_number in ["5551234567", "8888888888", "9999999999"]:
         otp = "123456"  # Fixed OTP for testing
     else:
         otp = OTPService.generate_otp(settings.OTP_LENGTH)

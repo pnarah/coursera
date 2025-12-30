@@ -114,11 +114,52 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // Save tokens
       final accessToken = response['access_token'];
       final refreshToken = response['refresh_token'];
-      await storage.saveTokens(accessToken, refreshToken);
+      
+      // Debug: Print token values before saving
+      print('DEBUG: Access Token: ${accessToken != null ? "EXISTS (${accessToken.toString().substring(0, 20)}...)" : "NULL"}');
+      print('DEBUG: Refresh Token: ${refreshToken != null ? "EXISTS (${refreshToken.toString().substring(0, 20)}...)" : "NULL"}');
+      
+      try {
+        await storage.saveTokens(accessToken, refreshToken);
+        print('DEBUG: Tokens saved successfully');
+        
+        // CRITICAL: Add delay to ensure tokens are fully persisted in browser storage
+        // FlutterSecureStorage on web has async localStorage writes that may not complete immediately
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        // Verify tokens were saved
+        final savedAccessToken = await storage.getAccessToken();
+        final savedRefreshToken = await storage.getRefreshToken();
+        print('DEBUG: Verified saved access token: ${savedAccessToken != null ? "EXISTS" : "NULL"}');
+        print('DEBUG: Verified saved refresh token: ${savedRefreshToken != null ? "EXISTS" : "NULL"}');
+        
+        if (savedAccessToken == null || savedRefreshToken == null) {
+          throw Exception('Token persistence verification failed - tokens not readable after save');
+        }
+      } catch (tokenError) {
+        print('ERROR: Failed to save tokens: $tokenError');
+        rethrow;
+      }
+      
       await storage.saveUserId(_mobileController.text.trim());
 
+      // Save user profile data from response
+      final user = response['user'];
+      if (user != null) {
+        await storage.saveUserProfile(
+          role: user['role'] ?? 'GUEST',
+          hotelId: user['hotel_id'],
+          fullName: user['full_name'],
+          email: user['email'],
+          mobile: user['mobile_number'],
+        );
+      }
+
       if (!mounted) return;
-      context.go('/hotels/search');
+
+      // Redirect to role-specific dashboard
+      final dashboardRoute = await storage.getRoleDashboardRoute();
+      context.go(dashboardRoute ?? '/dashboard/guest');
     } catch (e) {
       setState(() {
         _isLoading = false;
